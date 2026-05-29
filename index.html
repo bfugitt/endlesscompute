@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComputeIt: Endless Loop</title>
+    <!-- Tailwind CSS for rich modern layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Inter:wght@400;600;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .code-font {
+            font-family: 'Fira Code', monospace;
+        }
+
+        /* Smooth grid movement animation */
+        #player-dot {
+            transition: left 0.22s cubic-bezier(0.25, 1, 0.5, 1), top 0.22s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        /* Screen shake animation for errors */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-6px); }
+            40%, 80% { transform: translateX(6px); }
+        }
+        .shake {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        /* Keypress active state animation */
+        .key-btn:active {
+            transform: scale(0.92);
+        }
+
+        /* Pulse glow for conditional tiles */
+        .color-pad-glow {
+            box-shadow: 0 0 15px currentColor;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden antialiased select-none">
+
+    <!-- HEADER BAR -->
+    <header class="w-full bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between shadow-md">
+        <div class="flex items-center space-x-3">
+            <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-md shadow-indigo-500/20">
+                C
+            </div>
+            <div>
+                <h1 class="text-lg font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                    COMPUTE-IT <span class="text-xs font-normal text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full ml-1">ENDLESS v2.0</span>
+                </h1>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-6">
+            <!-- Score & Streak display -->
+            <div class="flex space-x-4">
+                <div class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1 text-center">
+                    <div class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Score</div>
+                    <div id="score-val" class="text-xl font-bold text-emerald-400">0</div>
+                </div>
+                <div class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1 text-center hidden sm:block">
+                    <div class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Streak</div>
+                    <div id="streak-val" class="text-xl font-bold text-amber-400">0</div>
+                </div>
+            </div>
+
+            <!-- Sound Controller -->
+            <button id="sound-btn" class="p-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-lg border border-slate-700 transition duration-150 relative group" title="Toggle Sound">
+                <!-- Speaker Icon -->
+                <svg id="sound-on-icon" class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M12 18.75V5.25L7.75 9.5H4.5v5h3.25L12 18.75z"/></svg>
+                <svg id="sound-off-icon" class="w-5 h-5 text-slate-500 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" /></svg>
+            </button>
+
+            <!-- Guide button -->
+            <button onclick="toggleHelpModal(true)" class="p-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-lg font-semibold transition text-white text-sm px-4">
+                How to Play
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN GAME AREA -->
+    <main class="flex-grow w-full max-w-7xl mx-auto px-4 md:px-6 py-6 flex flex-col lg:flex-row gap-6 items-stretch justify-center">
+        
+        <!-- LEFT COLUMN: VISUAL TERMINAL BOARD (GRID) -->
+        <div class="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-xl relative min-h-[400px]">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-2">
+                    <span class="w-3 h-3 rounded-full bg-rose-500"></span>
+                    <span class="w-3 h-3 rounded-full bg-amber-500"></span>
+                    <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                    <span class="text-xs text-slate-500 font-mono ml-2">virtual_environment.sys</span>
+                </div>
+                <div id="level-indicator" class="text-xs font-bold px-2.5 py-1 bg-slate-950 border border-slate-800 rounded-full text-slate-400">
+                    DIFFICULTY: SEQUENTIAL
+                </div>
+            </div>
+
+            <!-- Play Area Container (Keeps grid stable) -->
+            <div class="flex-grow flex items-center justify-center my-4 relative">
+                <!-- Dynamic 5x5 Grid Wrapper -->
+                <div id="grid-container" class="relative bg-slate-950 p-4 rounded-xl border-2 border-slate-800 aspect-square w-full max-w-[340px] md:max-w-[380px] shadow-inner transition-transform">
+                    
+                    <!-- Dynamic Tiles populated via JS -->
+                    <div id="grid-board" class="grid grid-cols-5 grid-rows-5 gap-3 h-full w-full"></div>
+
+                    <!-- Absolute Moving Player Cursor Dot -->
+                    <div id="player-dot" class="absolute bg-cyan-400 rounded-full shadow-[0_0_15px_#22d3ee] flex items-center justify-center z-10 select-none pointer-events-none">
+                        <!-- Tiny inner terminal cursor icon -->
+                        <div class="w-3 h-3 bg-white rounded-sm opacity-80 animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feedback / Input response ticker -->
+            <div id="feedback-bar" class="text-center h-10 flex items-center justify-center text-sm font-semibold transition duration-150">
+                <span class="text-slate-500 font-mono text-xs">Press matching arrow keys to execute instructions...</span>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: THE IDE CODE INTERPRETER -->
+        <div class="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between shadow-xl min-h-[400px]">
+            <!-- Header bar for IDE style -->
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                <div class="flex items-center space-x-2">
+                    <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    <span class="text-xs font-bold text-slate-400 font-mono">CPU_INSTRUCTIONS.py</span>
+                </div>
+                <div class="text-[11px] text-indigo-400 font-mono bg-indigo-950/40 border border-indigo-900/50 px-2 py-0.5 rounded">
+                    INTERPRETER ACTIVE
+                </div>
+            </div>
+
+            <!-- CODE CONTENT WINDOW -->
+            <div id="code-window" class="flex-grow bg-slate-950 border border-slate-850 rounded-xl p-6 code-font text-base sm:text-lg overflow-y-auto leading-relaxed relative flex flex-col justify-center min-h-[180px]">
+                <!-- Populated dynamically with rows of colored lines of code -->
+                <div id="code-lines-container" class="space-y-2.5">
+                    <!-- Example Line Structure:
+                    <div class="flex items-center space-x-4 opacity-50">
+                        <span class="w-6 text-right text-xs text-slate-650 select-none">1</span>
+                        <div class="text-slate-300">...</div>
+                    </div>
+                    -->
+                </div>
+            </div>
+
+            <!-- Reset current level warning/button -->
+            <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-800/60">
+                <span class="text-[11px] text-slate-500 max-w-[70%] leading-tight">If you get lost, reset will re-position your cursor back to the start tile.</span>
+                <button onclick="resetCurrentLevel()" class="text-xs font-bold text-slate-400 hover:text-rose-400 hover:bg-rose-950/20 px-3 py-1.5 border border-slate-700 hover:border-rose-900/50 rounded-lg transition duration-150">
+                    Reset State
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- TOUCHPAD VIRTUAL KEYBOARD CONTROLS (Ideal for Touch Chromebooks) -->
+    <footer class="w-full bg-slate-900/40 border-t border-slate-800/50 p-4">
+        <div class="max-w-md mx-auto">
+            <p class="text-center text-[10px] uppercase font-bold tracking-wider text-slate-500 mb-2 sm:hidden">Touch Pad Controller</p>
+            <div class="flex flex-col items-center gap-1.5 sm:scale-95">
+                <!-- Up Button -->
+                <button onclick="handleButtonInput('ArrowUp')" class="key-btn w-12 h-12 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 border-b-4 border-slate-900 active:border-b text-slate-300 rounded-xl flex items-center justify-center transition-all shadow-md">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"/></svg>
+                </button>
+                <!-- Row with Left, Down, Right -->
+                <div class="flex items-center gap-4">
+                    <button onclick="handleButtonInput('ArrowLeft')" class="key-btn w-12 h-12 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 border-b-4 border-slate-900 active:border-b text-slate-300 rounded-xl flex items-center justify-center transition-all shadow-md">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <button onclick="handleButtonInput('ArrowDown')" class="key-btn w-12 h-12 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 border-b-4 border-slate-900 active:border-b text-slate-300 rounded-xl flex items-center justify-center transition-all shadow-md">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <button onclick="handleButtonInput('ArrowRight')" class="key-btn w-12 h-12 bg-slate-800 hover:bg-slate-700 active:bg-slate-650 border-b-4 border-slate-900 active:border-b text-slate-300 rounded-xl flex items-center justify-center transition-all shadow-md">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- HOW TO PLAY / EDUCATIONAL MODAL -->
+    <div id="help-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all duration-200 opacity-0 pointer-events-none">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onclick="toggleHelpModal(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+            
+            <h3 class="text-xl font-extrabold text-white mb-4 flex items-center space-x-2">
+                <span class="text-indigo-400">⚡</span>
+                <span>HOW TO PLAY COMPUTE-IT</span>
+            </h3>
+
+            <div class="space-y-4 text-slate-300 text-sm leading-relaxed">
+                <p>
+                    In typical programming, you write the code. In <strong class="text-indigo-400">ComputeIt</strong>, <strong class="text-emerald-400">YOU are the computer!</strong> Your job is to read the code instructions and translate them into keyboard movements.
+                </p>
+
+                <div class="border-l-4 border-indigo-500 pl-3 py-1 bg-slate-950/40 rounded-r-lg">
+                    <h4 class="font-bold text-white text-xs uppercase tracking-wider">The Mission</h4>
+                    <p>Drive your glowing cursor from the <strong class="text-slate-400">Start Circle</strong> to the green glowing <strong class="text-emerald-400">Finish Goal</strong> by pressing Arrow keys perfectly matched to the program instructions.</p>
+                </div>
+
+                <div class="space-y-3">
+                    <h4 class="font-bold text-white text-xs uppercase tracking-wider text-indigo-400">Instruction Types:</h4>
+                    
+                    <div class="flex items-start space-x-3 bg-slate-950/50 p-2 rounded-lg border border-slate-800">
+                        <div class="text-xl">➡️</div>
+                        <div>
+                            <strong class="text-white block">Sequential Commands</strong>
+                            <code class="text-rose-400 font-mono text-xs">MOVE RIGHT</code> means press your <kbd class="bg-slate-800 text-xs px-1.5 py-0.5 rounded border border-slate-700">Right Arrow</kbd> key.
+                        </div>
+                    </div>
+
+                    <div class="flex items-start space-x-3 bg-slate-950/50 p-2 rounded-lg border border-slate-800">
+                        <div class="text-xl">🔄</div>
+                        <div>
+                            <strong class="text-white block">Loops (Repeat Block)</strong>
+                            <code class="text-rose-400 font-mono text-xs">REPEAT 3 TIMES: MOVE UP</code> means press <kbd class="bg-slate-800 text-xs px-1.5 py-0.5 rounded border border-slate-700">Up Arrow</kbd> 3 times in a row!
+                        </div>
+                    </div>
+
+                    <div class="flex items-start space-x-3 bg-slate-950/50 p-2 rounded-lg border border-slate-800">
+                        <div class="text-xl">❓</div>
+                        <div>
+                            <strong class="text-white block">Conditionals (If / Else)</strong>
+                            <p class="mb-1 text-slate-450">Check the glowing color under your player cursor tile:</p>
+                            <code class="text-rose-400 font-mono text-xs block">IF tile is RED: MOVE UP</code>
+                            <code class="text-rose-400 font-mono text-xs block">ELSE: MOVE LEFT</code>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="toggleHelpModal(false)" class="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition duration-150 mt-4 shadow-lg shadow-indigo-500/20">
+                    Let's Compute!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AUDIO DRIVER & GAME LOGIC SCRIPT -->
+    <script>
+        // Synthesizer Audio Driver using Web Audio API (100% self-contained offline sounds)
+        class AudioDriver {
+            constructor() {
+                this.ctx = null;
+                this.isMuted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            playBeep(freq, duration, type = 'sine') {
+                if (this.isMuted) return;
+                this.init();
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {
+                    console.warn("Audio Context Error: ", e);
+                }
+            }
+
+            playCorrectStep() {
+                // Happy little high chirp
+                this.playBeep(587.33, 0.08, 'sine'); // D5
+            }
+
+            playError() {
+                // Sad retro buzzer
+                this.playBeep(120, 0.35, 'sawtooth');
+            }
+
+            playLevelClear() {
+                // Rising melodic sequence
+                const now = this.ctx?.currentTime || 0;
+                this.playBeep(523.25, 0.1, 'triangle'); // C5
+                setTimeout(() => this.playBeep(659.25, 0.1, 'triangle'), 100); // E5
+                setTimeout(() => this.playBeep(783.99, 0.15, 'triangle'), 200); // G5
+                setTimeout(() => this.playBeep(1046.50, 0.3, 'triangle'), 300); // C6
+            }
+        }
+
+        const audio = new AudioDriver();
+
+        // Game State Variables
+        let score = 0;
+        let streak = 0;
+        
+        let pathCells = [];             // Visual coordinate list of level path
+        let startX = 2, startY = 4;     // Base coordinates (usually centered bottom)
+        let playerX = 2, playerY = 4;   // Current player coordinates
+        let goalX = 2, goalY = 0;       // Goal coordinates
+        
+        let colorPads = {};             // Key: 'x-y', Value: 'RED' or 'BLUE'
+
+        // Keystroke logic mapping
+        let commandSequence = [];       // Array of direction keys required
+        let currentSequenceIndex = 0;   // Where the user is in the correct path
+        let parsedInstructions = [];    // Visual lines display data
+
+        // Visual code elements tracker
+        const directionNames = {
+            'ArrowUp': 'UP',
+            'ArrowDown': 'DOWN',
+            'ArrowLeft': 'LEFT',
+            'ArrowRight': 'RIGHT'
+        };
+
+        // DOM Cache
+        const scoreVal = document.getElementById('score-val');
+        const streakVal = document.getElementById('streak-val');
+        const levelIndicator = document.getElementById('level-indicator');
+        const gridBoard = document.getElementById('grid-board');
+        const playerDot = document.getElementById('player-dot');
+        const gridContainer = document.getElementById('grid-container');
+        const codeLinesContainer = document.getElementById('code-lines-container');
+        const feedbackBar = document.getElementById('feedback-bar');
+        const soundBtn = document.getElementById('sound-btn');
+        const soundOnIcon = document.getElementById('sound-on-icon');
+        const soundOffIcon = document.getElementById('sound-off-icon');
+        const helpModal = document.getElementById('help-modal');
+
+        // Mute / Unmute Setup
+        soundBtn.addEventListener('click', () => {
+            audio.init();
+            audio.isMuted = !audio.isMuted;
+            if (audio.isMuted) {
+                soundOnIcon.classList.add('hidden');
+                soundOffIcon.classList.remove('hidden');
+            } else {
+                soundOnIcon.classList.remove('hidden');
+                soundOffIcon.classList.add('hidden');
+            }
+        });
+
+        function toggleHelpModal(show) {
+            audio.init();
+            if (show) {
+                helpModal.classList.remove('opacity-0', 'pointer-events-none');
+            } else {
+                helpModal.classList.add('opacity-0', 'pointer-events-none');
+            }
+        }
+
+        // Draw visual 5x5 grid cells
+        function setupVisualGrid() {
+            gridBoard.innerHTML = '';
+            for (let y = 0; y < 5; y++) {
+                for (let x = 0; x < 5; x++) {
+                    const tile = document.createElement('div');
+                    tile.id = `cell-${x}-${y}`;
+                    // Styled empty cell background
+                    tile.className = "bg-slate-900 border border-slate-850 rounded-lg flex items-center justify-center transition-all duration-300 relative overflow-hidden";
+                    gridBoard.appendChild(tile);
+                }
+            }
+        }
+
+        // Safe coordinates calculation within 5x5 grid
+        function getNextCoordinate(x, y, key) {
+            let nx = x;
+            let ny = y;
+            if (key === 'ArrowUp') ny--;
+            else if (key === 'ArrowDown') ny++;
+            else if (key === 'ArrowLeft') nx--;
+            else if (key === 'ArrowRight') nx++;
+            
+            if (nx >= 0 && nx < 5 && ny >= 0 && ny < 5) {
+                return { x: nx, y: ny, valid: true };
+            }
+            return { x, y, valid: false };
+        }
+
+        // Procedural generator that creates code and a mapping layout simultaneously
+        function generateProceduralLevel() {
+            setupVisualGrid();
+            
+            // Clean dynamic parameters
+            colorPads = {};
+            pathCells = [];
+            commandSequence = [];
+            parsedInstructions = [];
+            currentSequenceIndex = 0;
+
+            // Pick a reasonable start position in the grid bottom row
+            startX = Math.floor(Math.random() * 3) + 1; // 1, 2, 3
+            startY = 4; // Bottom row
+            
+            playerX = startX;
+            playerY = startY;
+            pathCells.push({ x: startX, y: startY });
+
+            let tempX = startX;
+            let tempY = startY;
+
+            // Decide instruction curve based on current Score/Streak difficulty brackets
+            let levelBracket = "SEQUENTIAL";
+            if (score >= 5 && score < 12) {
+                levelBracket = "LOOPS";
+            } else if (score >= 12 && score < 20) {
+                levelBracket = "CONDITIONALS";
+            } else if (score >= 20) {
+                levelBracket = "HYBRID CORE";
+            }
+            
+            levelIndicator.innerText = `LEVEL BRACKET: ${levelBracket}`;
+
+            // List of valid random directions
+            const directions = ['ArrowUp', 'ArrowLeft', 'ArrowRight', 'ArrowDown'];
+
+            // Function to find a safe step from temporary position that doesn't loop back instantly
+            function makeSafeRandomStep(currentX, currentY) {
+                let shuffledDirs = [...directions].sort(() => Math.random() - 0.5);
+                for (let dir of shuffledDirs) {
+                    let next = getNextCoordinate(currentX, currentY, dir);
+                    // Verify if it is valid inside grid and not already inside visual path list
+                    if (next.valid && !pathCells.some(cell => cell.x === next.x && cell.y === next.y)) {
+                        return { x: next.x, y: next.y, dir: dir };
+                    }
+                }
+                return null; // Dead end
+            }
+
+            if (levelBracket === "SEQUENTIAL") {
+                // Generate 2 to 3 basic movements
+                let stepsCount = Math.floor(Math.random() * 2) + 2; // 2 or 3
+                for (let i = 0; i < stepsCount; i++) {
+                    let step = makeSafeRandomStep(tempX, tempY);
+                    if (step) {
+                        tempX = step.x;
+                        tempY = step.y;
+                        pathCells.push({ x: tempX, y: tempY });
+                        commandSequence.push(step.dir);
+                        parsedInstructions.push({
+                            type: 'action',
+                            text: `MOVE ${directionNames[step.dir]}`,
+                            activeKeysMap: [commandSequence.length - 1] // Maps visual line to active key indices
+                        });
+                    }
+                }
+
+            } else if (levelBracket === "LOOPS") {
+                // Generate a loop statement (e.g. REPEAT 3 TIMES: UP)
+                let loopCount = Math.floor(Math.random() * 2) + 2; // Repeat 2 or 3 times
+                let loopDir = 'ArrowUp'; // Prioritize upward motion
+                
+                // Ensure loop direction is viable
+                let simulatedX = tempX;
+                let simulatedY = tempY;
+                let loopValid = true;
+
+                for (let i = 0; i < loopCount; i++) {
+                    let next = getNextCoordinate(simulatedX, simulatedY, loopDir);
+                    if (next.valid) {
+                        simulatedX = next.x;
+                        simulatedY = next.y;
+                    } else {
+                        loopValid = false;
+                    }
+                }
+
+                // If Up is blocked, pick random direction
+                if (!loopValid) {
+                    let alternative = makeSafeRandomStep(tempX, tempY);
+                    if (alternative) {
+                        loopDir = alternative.dir;
+                        loopCount = 2; // Simple loop
+                    } else {
+                        loopDir = 'ArrowUp';
+                    }
+                }
+
+                // Commit Loop commands
+                let loopKeysIndexes = [];
+                for (let i = 0; i < loopCount; i++) {
+                    let next = getNextCoordinate(tempX, tempY, loopDir);
+                    tempX = next.x;
+                    tempY = next.y;
+                    pathCells.push({ x: tempX, y: tempY });
+                    commandSequence.push(loopDir);
+                    loopKeysIndexes.push(commandSequence.length - 1);
+                }
+
+                parsedInstructions.push({
+                    type: 'loop-header',
+                    text: `REPEAT ${loopCount} TIMES:`,
+                    activeKeysMap: []
+                });
+                parsedInstructions.push({
+                    type: 'loop-action',
+                    text: `MOVE ${directionNames[loopDir]}`,
+                    activeKeysMap: loopKeysIndexes
+                });
+
+                // Follow up with 1 simple step to keep tracking logical flow
+                let followStep = makeSafeRandomStep(tempX, tempY);
+                if (followStep) {
+                    tempX = followStep.x;
+                    tempY = followStep.y;
+                    pathCells.push({ x: tempX, y: tempY });
+                    commandSequence.push(followStep.dir);
+                    parsedInstructions.push({
+                        type: 'action',
+                        text: `MOVE ${directionNames[followStep.dir]}`,
+                        activeKeysMap: [commandSequence.length - 1]
+                    });
+                }
+
+            } else if (levelBracket === "CONDITIONALS") {
+                // Generate a conditional color node under player start tile
+                let triggerColor = Math.random() > 0.5 ? 'RED' : 'BLUE';
+                colorPads[`${tempX}-${tempY}`] = triggerColor;
+
+                // Pick two safe divergent directions for the condition
+                let shuffledDirs = [...directions].sort(() => Math.random() - 0.5);
+                let opt1 = shuffledDirs[0];
+                let opt2 = shuffledDirs[1];
+
+                // Ensure both alternative coordinates are valid in-bound cells
+                let testOpt1 = getNextCoordinate(tempX, tempY, opt1);
+                let testOpt2 = getNextCoordinate(tempX, tempY, opt2);
+
+                if (!testOpt1.valid) opt1 = 'ArrowUp';
+                if (!testOpt2.valid) opt2 = 'ArrowLeft';
+
+                // Re-evaluate
+                let chosenDir = triggerColor === 'RED' ? opt1 : opt2;
+                
+                // Commit the correct simulated outcome
+                let resultCell = getNextCoordinate(tempX, tempY, chosenDir);
+                tempX = resultCell.x;
+                tempY = resultCell.y;
+                pathCells.push({ x: tempX, y: tempY });
+                commandSequence.push(chosenDir);
+
+                // Build code visual structure
+                parsedInstructions.push({
+                    type: 'cond-if',
+                    text: `IF current_tile == "RED":`,
+                    activeKeysMap: []
+                });
+                parsedInstructions.push({
+                    type: 'cond-action-if',
+                    text: `MOVE ${directionNames[opt1]}`,
+                    activeKeysMap: triggerColor === 'RED' ? [commandSequence.length - 1] : []
+                });
+                parsedInstructions.push({
+                    type: 'cond-else',
+                    text: `ELSE:`,
+                    activeKeysMap: []
+                });
+                parsedInstructions.push({
+                    type: 'cond-action-else',
+                    text: `MOVE ${directionNames[opt2]}`,
+                    activeKeysMap: triggerColor === 'BLUE' ? [commandSequence.length - 1] : []
+                });
+
+                // Add 1 extra steps after condition
+                let finalStep = makeSafeRandomStep(tempX, tempY);
+                if (finalStep) {
+                    tempX = finalStep.x;
+                    tempY = finalStep.y;
+                    pathCells.push({ x: tempX, y: tempY });
+                    commandSequence.push(finalStep.dir);
+                    parsedInstructions.push({
+                        type: 'action',
+                        text: `MOVE ${directionNames[finalStep.dir]}`,
+                        activeKeysMap: [commandSequence.length - 1]
+                    });
+                }
+
+            } else {
+                // Advanced hybrid mix combining loops & colors
+                let triggerColor = Math.random() > 0.5 ? 'RED' : 'BLUE';
+                colorPads[`${tempX}-${tempY}`] = triggerColor;
+
+                let ifDir = 'ArrowUp';
+                let elseDir = 'ArrowLeft';
+                
+                let chosenDir = triggerColor === 'RED' ? ifDir : elseDir;
+                let testCell = getNextCoordinate(tempX, tempY, chosenDir);
+                if (!testCell.valid) {
+                    chosenDir = 'ArrowRight';
+                    ifDir = 'ArrowRight';
+                }
+
+                // Add correct movement path
+                let resultCell = getNextCoordinate(tempX, tempY, chosenDir);
+                tempX = resultCell.x;
+                tempY = resultCell.y;
+                pathCells.push({ x: tempX, y: tempY });
+                commandSequence.push(chosenDir);
+
+                // Add Conditional visual instructions
+                parsedInstructions.push({ type: 'cond-if', text: `IF current_tile == "RED":`, activeKeysMap: [] });
+                parsedInstructions.push({ type: 'cond-action-if', text: `MOVE ${directionNames[ifDir]}`, activeKeysMap: triggerColor === 'RED' ? [commandSequence.length - 1] : [] });
+                parsedInstructions.push({ type: 'cond-else', text: `ELSE:`, activeKeysMap: [] });
+                parsedInstructions.push({ type: 'cond-action-else', text: `MOVE ${directionNames[elseDir]}`, activeKeysMap: triggerColor === 'BLUE' ? [commandSequence.length - 1] : [] });
+
+                // Add loop directly following condition
+                let finalDir = makeSafeRandomStep(tempX, tempY);
+                let fDir = finalDir ? finalDir.dir : 'ArrowUp';
+                let loopCount = 2;
+
+                let simX = tempX;
+                let simY = tempY;
+                let finalKeysIndex = [];
+
+                for (let j = 0; j < loopCount; j++) {
+                    let next = getNextCoordinate(simX, simY, fDir);
+                    if (next.valid) {
+                        simX = next.x;
+                        simY = next.y;
+                        pathCells.push({ x: simX, y: simY });
+                        commandSequence.push(fDir);
+                        finalKeysIndex.push(commandSequence.length - 1);
+                    }
+                }
+                tempX = simX;
+                tempY = simY;
+
+                parsedInstructions.push({ type: 'loop-header', text: `REPEAT ${loopCount} TIMES:`, activeKeysMap: [] });
+                parsedInstructions.push({ type: 'loop-action', text: `MOVE ${directionNames[fDir]}`, activeKeysMap: finalKeysIndex });
+            }
+
+            // Set Goal Cell Destination (last computed block cell)
+            goalX = tempX;
+            goalY = tempY;
+
+            // Render Path & Highlight colors
+            renderVisualBoard();
+            renderVisualCode();
+            repositionPlayerDot();
+        }
+
+        // Draw and highlight the generated maze track visually on grid cells
+        function renderVisualBoard() {
+            // Apply standard backgrounds
+            for (let y = 0; y < 5; y++) {
+                for (let x = 0; x < 5; x++) {
+                    const cell = document.getElementById(`cell-${x}-${y}`);
+                    if (!cell) continue;
+
+                    // Clean previous states
+                    cell.className = "bg-slate-900 border border-slate-850 rounded-lg flex items-center justify-center transition-all duration-300 relative overflow-hidden";
+                    cell.innerHTML = "";
+                    cell.style.color = "";
+                }
+            }
+
+            // Render path connecting cells (gives students immediate highway visualization)
+            pathCells.forEach((c) => {
+                const cell = document.getElementById(`cell-${c.x}-${c.y}`);
+                if (cell) {
+                    cell.classList.remove('bg-slate-900');
+                    cell.classList.add('bg-slate-800/80', 'border-slate-700/50');
+                }
+            });
+
+            // Color code matching floor tiles if present (RED / BLUE)
+            Object.keys(colorPads).forEach((key) => {
+                const cell = document.getElementById(`cell-${key}`);
+                const color = colorPads[key];
+                if (cell) {
+                    cell.classList.remove('bg-slate-800/80');
+                    if (color === 'RED') {
+                        cell.classList.add('bg-rose-950/40', 'border-rose-500/50', 'text-rose-400', 'color-pad-glow');
+                        cell.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500 animate-ping absolute"></span>
+                                          <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>`;
+                    } else if (color === 'BLUE') {
+                        cell.classList.add('bg-indigo-950/40', 'border-indigo-500/50', 'text-indigo-400', 'color-pad-glow');
+                        cell.innerHTML = `<span class="w-2 h-2 rounded-full bg-indigo-500 animate-ping absolute"></span>
+                                          <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>`;
+                    }
+                }
+            });
+
+            // Start Position Indicator
+            const startCell = document.getElementById(`cell-${startX}-${startY}`);
+            if (startCell) {
+                // Simple halo effect
+                startCell.classList.add('border-dashed', 'border-slate-400');
+            }
+
+            // Finish Goal Tile
+            const goalCell = document.getElementById(`cell-${goalX}-${goalY}`);
+            if (goalCell) {
+                goalCell.classList.remove('bg-slate-800/80');
+                goalCell.classList.add('bg-emerald-950/40', 'border-emerald-500', 'shadow-[0_0_15px_rgba(16,185,129,0.3)]');
+                goalCell.innerHTML = `
+                    <div class="animate-bounce">
+                        <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 3v18M5 3l14 4-14 4"/>
+                        </svg>
+                    </div>
+                `;
+            }
+        }
+
+        // Draw and update the right column visual text code blocks with syntax highlighting
+        function renderVisualCode() {
+            codeLinesContainer.innerHTML = '';
+            
+            parsedInstructions.forEach((line, index) => {
+                const isLineActive = line.activeKeysMap.includes(currentSequenceIndex);
+                const isLineCompleted = line.activeKeysMap.length > 0 && line.activeKeysMap.every(idx => idx < currentSequenceIndex);
+                
+                // Outer container
+                const row = document.createElement('div');
+                row.className = `flex items-center space-x-4 py-1.5 px-3 rounded-lg transition-all duration-200 ${
+                    isLineActive ? 'bg-indigo-950/40 border border-indigo-900/60 shadow-md' : 'opacity-60'
+                }`;
+
+                // Left sidebar indicators (Active Arrow & Line Number)
+                const lineIndicator = document.createElement('div');
+                lineIndicator.className = "flex items-center space-x-2 w-8 flex-shrink-0";
+                
+                if (isLineActive) {
+                    lineIndicator.innerHTML = `
+                        <span class="text-indigo-400 animate-pulse">👉</span>
+                    `;
+                } else if (isLineCompleted) {
+                    lineIndicator.innerHTML = `
+                        <span class="text-emerald-500 font-bold">✓</span>
+                    `;
+                } else {
+                    lineIndicator.innerHTML = `
+                        <span class="text-xs text-slate-700 font-mono">${index + 1}</span>
+                    `;
+                }
+
+                // Styled code line content
+                const codeBlock = document.createElement('div');
+                codeBlock.className = `flex-grow select-all font-mono tracking-wide ${
+                    isLineActive ? 'text-white font-semibold' : 'text-slate-450'
+                }`;
+
+                // Indentation styling rules
+                if (line.type === 'loop-action' || line.type === 'cond-action-if' || line.type === 'cond-action-else') {
+                    codeBlock.classList.add('pl-6', 'border-l-2', 'border-slate-800');
+                }
+
+                // Generate colored code text matches
+                codeBlock.innerHTML = syntaxHighlight(line.text, line.type);
+
+                row.appendChild(lineIndicator);
+                row.appendChild(codeBlock);
+                codeLinesContainer.appendChild(row);
+            });
+        }
+
+        // Simple syntax highlight processor
+        function syntaxHighlight(text, type) {
+            let processed = text;
+            
+            // Highlight directions
+            ['UP', 'DOWN', 'LEFT', 'RIGHT'].forEach(dir => {
+                processed = processed.replace(dir, `<span class="text-cyan-400 font-bold">${dir}</span>`);
+            });
+
+            // Highlight loops, variables & values
+            processed = processed.replace('REPEAT', `<span class="text-rose-400 font-bold">repeat</span>`);
+            processed = processed.replace('TIMES:', `<span class="text-rose-400 font-bold">times</span>:`);
+            processed = processed.replace('IF', `<span class="text-amber-400 font-bold">if</span>`);
+            processed = processed.replace('ELSE:', `<span class="text-amber-400 font-bold">else</span>:`);
+            processed = processed.replace('"RED"', `<span class="text-rose-400">"RED"</span>`);
+            processed = processed.replace('"BLUE"', `<span class="text-indigo-400">"BLUE"</span>`);
+            processed = processed.replace('current_tile', `<span class="text-slate-300 italic">current_tile</span>`);
+            processed = processed.replace('==', `<span class="text-emerald-400">==</span>`);
+
+            // Actions mapping
+            processed = processed.replace('MOVE', `<span class="text-indigo-400">move_to</span>`);
+
+            return processed;
+        }
+
+        // Calculate and smoothly align visual player cursor dot over current coordinate
+        function repositionPlayerDot() {
+            const currentCell = document.getElementById(`cell-${playerX}-${playerY}`);
+            if (currentCell) {
+                const cellRect = currentCell.getBoundingClientRect();
+                const containerRect = gridContainer.getBoundingClientRect();
+                
+                // Adjust position relative to relative parent board container
+                playerDot.style.left = `${currentCell.offsetLeft + 10}px`;
+                playerDot.style.top = `${currentCell.offsetTop + 10}px`;
+                playerDot.style.width = `${currentCell.offsetWidth - 20}px`;
+                playerDot.style.height = `${currentCell.offsetHeight - 20}px`;
+            }
+        }
+
+        // Action when a correct button or physical key is processed
+        function processSuccessfulMovement(nextKey) {
+            audio.playCorrectStep();
+            
+            // Advance positions
+            const nextCoord = getNextCoordinate(playerX, playerY, nextKey);
+            playerX = nextCoord.x;
+            playerY = nextCoord.y;
+            currentSequenceIndex++;
+
+            repositionPlayerDot();
+            
+            // Print status message
+            feedbackBar.innerHTML = `<span class="text-emerald-400 font-mono text-sm">✔ LINE ${currentSequenceIndex} EXECUTION EXCELLENT</span>`;
+
+            // If path complete, level is cleared!
+            if (currentSequenceIndex === commandSequence.length) {
+                handleLevelClear();
+            } else {
+                renderVisualCode();
+            }
+        }
+
+        // Process a wrong movement key
+        function processFailedMovement() {
+            audio.playError();
+            
+            // Reset player to start of level
+            playerX = startX;
+            playerY = startY;
+            currentSequenceIndex = 0;
+
+            repositionPlayerDot();
+            renderVisualCode();
+
+            // Apply grid shake visual feedback
+            gridContainer.classList.add('shake');
+            playerDot.classList.add('bg-rose-500', 'shadow-[0_0_20px_#f43f5e]');
+            playerDot.classList.remove('bg-cyan-400', 'shadow-[0_0_15px_#22d3ee]');
+            
+            feedbackBar.innerHTML = `<span class="text-rose-400 font-mono text-sm">❌ ERROR: RUNTIME_FAULT. Cursor state reset.</span>`;
+
+            setTimeout(() => {
+                gridContainer.classList.remove('shake');
+                playerDot.classList.remove('bg-rose-500', 'shadow-[0_0_20px_#f43f5e]');
+                playerDot.classList.add('bg-cyan-400', 'shadow-[0_0_15px_#22d3ee]');
+            }, 400);
+
+            // Lose streak status on failure
+            streak = 0;
+            streakVal.innerText = streak;
+        }
+
+        function handleLevelClear() {
+            audio.playLevelClear();
+            
+            // Celebrate Score & Streak upgrades
+            score++;
+            streak++;
+            
+            scoreVal.innerText = score;
+            streakVal.innerText = streak;
+
+            feedbackBar.innerHTML = `
+                <span class="text-emerald-400 font-bold font-mono text-base tracking-wider animate-bounce">
+                    🎉 PROGRAM COMPILED SUCCESSFULLY!
+                </span>
+            `;
+
+            // Quick pause before generating next puzzle so student sees completion
+            setTimeout(() => {
+                generateProceduralLevel();
+            }, 1000);
+        }
+
+        // Manual state reset
+        function resetCurrentLevel() {
+            audio.init();
+            playerX = startX;
+            playerY = startY;
+            currentSequenceIndex = 0;
+            repositionPlayerDot();
+            renderVisualCode();
+            feedbackBar.innerHTML = `<span class="text-slate-400 font-mono text-xs">Runtime manually reset. Start grid segment active.</span>`;
+        }
+
+        // Universal handler for both touch-pad and physical keyboard input
+        function handleUniversalInput(inputKey) {
+            audio.init();
+            
+            // Check if the game is expecting more inputs
+            if (currentSequenceIndex >= commandSequence.length) return;
+
+            const expectedKey = commandSequence[currentSequenceIndex];
+
+            if (inputKey === expectedKey) {
+                processSuccessfulMovement(inputKey);
+            } else {
+                processFailedMovement();
+            }
+        }
+
+        // Core Keyboard event handler
+        document.addEventListener('keydown', (event) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+                // Prevent browser standard page scrolls
+                event.preventDefault();
+                handleUniversalInput(event.key);
+            }
+        });
+
+        // Touch Control routing
+        function handleButtonInput(key) {
+            handleUniversalInput(key);
+        }
+
+        // Recalculate dots when windows size alters
+        window.addEventListener('resize', repositionPlayerDot);
+
+        // Run game setup onload
+        window.onload = () => {
+            generateProceduralLevel();
+            // Automatically launch helpful instructions modal for first-time play
+            setTimeout(() => {
+                toggleHelpModal(true);
+            }, 300);
+        };
+    </script>
+</body>
+</html>
