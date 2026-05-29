@@ -661,34 +661,26 @@
 
         // Draw and highlight the generated maze track visually on grid cells
         function renderVisualBoard() {
-            // Apply standard backgrounds
+            // Apply standard backgrounds to make all grid cells look identical
             for (let y = 0; y < 5; y++) {
                 for (let x = 0; x < 5; x++) {
                     const cell = document.getElementById(`cell-${x}-${y}`);
                     if (!cell) continue;
 
-                    // Clean previous states
+                    // All cells now have the exact same default bg layout (no visible path)
                     cell.className = "bg-slate-900 border border-slate-850 rounded-lg flex items-center justify-center transition-all duration-300 relative overflow-hidden";
                     cell.innerHTML = "";
                     cell.style.color = "";
                 }
             }
 
-            // Render path connecting cells (gives students immediate highway visualization)
-            pathCells.forEach((c) => {
-                const cell = document.getElementById(`cell-${c.x}-${c.y}`);
-                if (cell) {
-                    cell.classList.remove('bg-slate-900');
-                    cell.classList.add('bg-slate-800/80', 'border-slate-700/50');
-                }
-            });
+            // Path highlighting loop has been removed so that children cannot cheat by looking at the path!
 
             // Color code matching floor tiles if present (RED / BLUE)
             Object.keys(colorPads).forEach((key) => {
                 const cell = document.getElementById(`cell-${key}`);
                 const color = colorPads[key];
                 if (cell) {
-                    cell.classList.remove('bg-slate-800/80');
                     if (color === 'RED') {
                         cell.classList.add('bg-rose-950/40', 'border-rose-500/50', 'text-rose-400', 'color-pad-glow');
                         cell.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500 animate-ping absolute"></span>
@@ -701,17 +693,19 @@
                 }
             });
 
-            // Start Position Indicator
+            // Start Position Indicator (with a dashed border and subtle inner ring)
             const startCell = document.getElementById(`cell-${startX}-${startY}`);
             if (startCell) {
-                // Simple halo effect
-                startCell.classList.add('border-dashed', 'border-slate-400');
+                startCell.classList.add('border-dashed', 'border-slate-500');
+                // Only draw a starting marker if the player has moved off of it
+                if (playerX !== startX || playerY !== startY) {
+                    startCell.innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-slate-700/80"></div>`;
+                }
             }
 
-            // Finish Goal Tile
+            // Finish Goal Tile (remains fully visible with flag)
             const goalCell = document.getElementById(`cell-${goalX}-${goalY}`);
             if (goalCell) {
-                goalCell.classList.remove('bg-slate-800/80');
                 goalCell.classList.add('bg-emerald-950/40', 'border-emerald-500', 'shadow-[0_0_15px_rgba(16,185,129,0.3)]');
                 goalCell.innerHTML = `
                     <div class="animate-bounce">
@@ -826,6 +820,7 @@
             currentSequenceIndex++;
 
             repositionPlayerDot();
+            renderVisualBoard(); // Refresh visual board elements (like the start location marker)
             
             // Print status message
             feedbackBar.innerHTML = `<span class="text-emerald-400 font-mono text-sm">✔ LINE ${currentSequenceIndex} EXECUTION EXCELLENT</span>`;
@@ -848,6 +843,7 @@
             currentSequenceIndex = 0;
 
             repositionPlayerDot();
+            renderVisualBoard();
             renderVisualCode();
 
             // Apply grid shake visual feedback
@@ -897,6 +893,7 @@
             playerY = startY;
             currentSequenceIndex = 0;
             repositionPlayerDot();
+            renderVisualBoard();
             renderVisualCode();
             feedbackBar.innerHTML = `<span class="text-slate-400 font-mono text-xs">Runtime manually reset. Start grid segment active.</span>`;
         }
